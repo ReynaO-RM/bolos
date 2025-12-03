@@ -1,4 +1,10 @@
+// bowlchallenge.js (ADAPTADO para ser un módulo de juego llamado por main.js)
 
+// ===================================================================
+// VARIABLES GLOBALES (Limpiadas de duplicados de Three.js)
+// ===================================================================
+
+// Nota: Constantes como BALL_ANGLE_MAX y TRACK_WIDTH se asumen definidas en bowlphysics.js o scores.js
 const CAMERA_FOV = 50.0;
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 10.0;
@@ -7,9 +13,11 @@ const FRAME_ROLL_TIME = 3.0;
 
 const GRAB_BALL_THRESHOLD_INCH = 0.05;
 const GRAB_BALL_THRESHOLD_INCH_SQUARED = GRAB_BALL_THRESHOLD_INCH * GRAB_BALL_THRESHOLD_INCH;
-const GRAB_BALL_ROLL_POS_RATIO = Math.tan(BALL_ANGLE_MAX);
+// Se asume que BALL_ANGLE_MAX está definido en bowlphysics.js
+const GRAB_BALL_ROLL_POS_RATIO = Math.tan(BALL_ANGLE_MAX); 
 
-const TRACK_DISTANCE = TRACK_WIDTH + 0.1;
+// Se asume que TRACK_WIDTH está definido en bowlphysics.js
+const TRACK_DISTANCE = TRACK_WIDTH + 0.1; 
 
 const IMITATION_EMERGING_TIME_MIN = 2.0;
 const IMITATION_EMERGING_TIME_MAX = 10.0;
@@ -59,8 +67,7 @@ class Imitation {
 // FUNCIONES UTILITARIAS (Adaptadas)
 // ===================================================================
 
-// ELIMINADA: function init() { ... }
-// ELIMINADA: function setAnisotropy(parent, anisotropy) { ... } (Acceso a renderer es complicado aquí)
+// ELIMINADAS: function init(), function setAnisotropy(parent, anisotropy)
 
 function getLocalPlayer() {
 	if (!players) {
@@ -72,7 +79,8 @@ function getLocalPlayer() {
 // ADAPTADA: Ahora recibe la escena y la física ya creadas por main.js
 function addPlayer(id, local, slot, sceneRef, physicsRef) {
 	var physics = physicsRef; 
-	var scores = new Scores();
+	// Scores se asume disponible globalmente
+	var scores = new Scores(); 
 
 	var group = new THREE.Group();
 	group.position.x = slot * TRACK_DISTANCE;
@@ -84,6 +92,7 @@ function addPlayer(id, local, slot, sceneRef, physicsRef) {
 	var ballMesh = ballProtoMesh.clone();
 	group.add(ballMesh);
 
+	// PIN_COUNT se asume disponible globalmente (de bowlphysics.js)
 	var pinMeshes = new Array(PIN_COUNT); 
 	for (var i = 0; i < pinMeshes.length; i++) {
 		var pinMesh = pinProtoMesh.clone();
@@ -116,7 +125,8 @@ function removePlayer(id, sceneRef) {
 }
 
 function createImitation(slot) {
-	var frames = 1 + Math.floor(Math.random() * FRAME_COUNT);
+	// FRAME_COUNT se asume disponible globalmente (de scores.js)
+	var frames = 1 + Math.floor(Math.random() * FRAME_COUNT); 
 	var emergingTime = IMITATION_EMERGING_TIME_MIN + Math.random()
 			* (IMITATION_EMERGING_TIME_MAX - IMITATION_EMERGING_TIME_MIN);
 	return new Imitation(frames, emergingTime, slot);
@@ -172,9 +182,8 @@ function updateImitation(imitation, dt, sceneRef) {
 	imitation.player.physics.releaseBall(velocity, angle);
 }
 
-// ELIMINADA: function initScene() { ... } (su lógica se mueve a window.BowlChallenge)
+// ELIMINADA: function initScene() 
 
-// MODIFICADA: Eliminamos la actualización directa al DOM (scoresDiv.innerHTML = ...)
 function updateGame(player, dt) {
 	player.physics.updatePhysics(dt);
 
@@ -186,7 +195,7 @@ function updateGame(player, dt) {
 		var prevFrameNumber = player.scores.frameNumber;
 		player.scores.addThrowResult(beatenPinCount);
 		
-		// ELIMINADA: La actualización directa del score aquí. Main.js lo maneja.
+		// ELIMINADA: La actualización directa del scoreDiv. main.js lo maneja vía updateHUD().
 
 		if (!player.scores.gameOver) {
 			var pinsMask;
@@ -252,28 +261,26 @@ function syncView(player) {
 }
 
 // ===================================================================
-// FUNCIONES DE ACCIÓN (Mantenidas)
+// FUNCIONES DE ACCIÓN (Adaptadas para VR)
 // ===================================================================
 
-// Estas funciones necesitan que raycaster y pickSphere estén inicializados
-// y necesitan el valor de ppi.
-
-function updateTouchRay(clientX, clientY) {
-	// NOTA: Esta lógica asume un renderer.domElement y rect.
-	// En VR, main.js debe llamar a estas funciones, y el raycaster debe ser 
-	// el raycaster de VR. Mantendré la lógica original aquí, pero la dependencia
-	// de renderer.domElement y ppi puede causar inexactitud en el lanzamiento.
+function updateTouchRay(clientX, clientY, cameraRef) {
+	// En VR, esta función no se usa tan directamente, pero la mantenemos
+	// para que las funciones onActionDown/Up/Move funcionen como en el original.
+	// La referencia a THREE.js es necesaria
+    
+    // Asumimos que cameraRef es la cámara pasada desde main.js
 	var rect = document.getElementById('scene').getBoundingClientRect();
     
 	touchPoint.x = ((clientX - rect.left) / rect.width) * 2.0 - 1.0;
 	touchPoint.y = -((clientY - rect.top) / rect.height) * 2.0 + 1.0;
 
-    // Asumo que camera ya fue pasado y está disponible de forma global o local.
-	raycaster.setFromCamera(touchPoint, players[0].cameraRef || camera); 
+	// raycaster se inicializa en window.BowlChallenge.
+	raycaster.setFromCamera(touchPoint, cameraRef); 
 }
 
 function intersectTouchPlane(ray) {
-    // Asumo que BASE_HEIGHT es una constante global definida en otro script.
+    // BASE_HEIGHT se asume de bowlphysics.js
 	if (Math.abs(ray.direction.y) > 1e-5) { 
 		var t = (BASE_HEIGHT - ray.origin.y) / ray.direction.y;
 		if (t >= 0.0) {
@@ -284,7 +291,8 @@ function intersectTouchPlane(ray) {
 	return false;
 }
 
-function onActionDown(clientX, clientY, time) {
+// onActionDown recibe clientX, clientY, time y el objeto camera de main.js
+function onActionDown(clientX, clientY, time, cameraRef) {
 	var localPlayer = getLocalPlayer();
 	if (!localPlayer) {
 		return;
@@ -297,7 +305,7 @@ function onActionDown(clientX, clientY, time) {
     // Usamos un valor fijo para ppi, ya que no podemos acceder a renderer aquí.
     var ppi = 96 * window.devicePixelRatio; 
 
-	updateTouchRay(clientX, clientY);
+	updateTouchRay(clientX, clientY, cameraRef); // Usar la referencia de la cámara
 
 	pickingBall = false;
 	positioningBall = false;
@@ -307,7 +315,7 @@ function onActionDown(clientX, clientY, time) {
 		return;
 	}
 
-    // Asumo que BALL_HEIGHT y BALL_LINE son constantes globales.
+    // BALL_HEIGHT, BALL_LINE, BALL_RADIUS se asumen de bowlphysics.js
 	pickSphere.center.set(localPlayer.physics.releasePosition, BALL_HEIGHT, BALL_LINE);
 	if (raycaster.ray.intersectsSphere(pickSphere)) {
 		pickOffset = dragPoint.x - localPlayer.physics.releasePosition;
@@ -319,7 +327,8 @@ function onActionDown(clientX, clientY, time) {
 	}
 }
 
-function onActionMove(clientX, clientY, time) {
+// onActionMove recibe clientX, clientY, time y el objeto camera de main.js
+function onActionMove(clientX, clientY, time, cameraRef) {
 	var localPlayer = getLocalPlayer();
 	if (!localPlayer) {
 		return;
@@ -329,10 +338,10 @@ function onActionMove(clientX, clientY, time) {
 		return;
 	}
     
-    // Usamos un valor fijo para ppi, ya que no podemos acceder a renderer aquí.
+    // Usamos un valor fijo para ppi
     var ppi = 96 * window.devicePixelRatio; 
 
-	updateTouchRay(clientX, clientY);
+	updateTouchRay(clientX, clientY, cameraRef); // Usar la referencia de la cámara
 
 	if (!intersectTouchPlane(raycaster.ray)) {
 		return;
@@ -371,7 +380,7 @@ function onActionUp(clientX, clientY, time) {
 
 	if (rollingBall) {
 		releaseVector.copy(dragPoint).sub(pickPoint);
-        // Asumo que BALL_VELOCITY_MAX es una constante global.
+        // BALL_VELOCITY_MAX se asume disponible
 		var velocity = (time > pickTime)
 				? releaseVector.length() / (1e-3 * (time - pickTime))
 				: BALL_VELOCITY_MAX;
@@ -384,32 +393,34 @@ function onActionUp(clientX, clientY, time) {
 	rollingBall = false;
 }
 
-// ELIMINADAS: onDocumentMouseDown, onDocumentMouseMove, onDocumentMouseUp, 
-// onDocumentTouchStart, onDocumentTouchMove, onDocumentTouchEnd (¡CRÍTICO! Main.js usa onActionDown/Up)
+// ELIMINADAS: Todas las funciones onDocumentMouse/Touch...
 
 // ===================================================================
-// INICIALIZACIÓN ADAPTADA PARA VR (REEMPLAZA function init())
+// INICIALIZACIÓN ADAPTADA PARA VR (window.BowlChallenge)
 // ===================================================================
 
 // Exportamos la función para que main.js la llame después de Ammo()
 window.BowlChallenge = function(sceneRef, physicsRef, playerGroup, cameraRef) {
     
-    // Inicialización de variables globales usadas por onActionDown/Up
+	// 1. Inicialización de variables globales usadas por onActionDown/Up
     touchPoint = new THREE.Vector2();
     pickPoint = new THREE.Vector3();
     dragPoint = new THREE.Vector3();
     releaseVector = new THREE.Vector3();
+	
+	// Raycaster y pickSphere se inicializan aquí
     raycaster = new THREE.Raycaster();
-    // Usamos BALL_RADIUS del objeto physics para inicializar pickSphere si está disponible
+    // Asumimos que BALL_RADIUS está en physicsRef si no está globalmente
     pickSphere = new THREE.Sphere(new THREE.Vector3(), physicsRef.BALL_RADIUS || 0.1); 
     
-    // LÓGICA DE CARGA DE MODELOS
+    // 2. LÓGICA DE CARGA DE MODELOS
+	// THREE.GLTFLoader se asume globalmente disponible
 	var loader = new THREE.GLTFLoader();
 	
-	// RUTA CRÍTICA: Asegúrate que esta ruta sea correcta
-	loader.load("assets/models/scene.gltf", (gltf) => {
+	// RUTA CRÍTICA: La ruta del GLTF debe ser la correcta (res/scene.gltf según tu código original)
+	loader.load("res/scene.gltf", (gltf) => {
 		
-		// 1. Extraer los prototipos del modelo GLTF
+		// 2.1 Extraer los prototipos del modelo GLTF
 		trackProtoMesh = gltf.scene.children.find(child => child.name == "Track");
 		if (!trackProtoMesh) {
 			throw new Error("Track not found");
@@ -423,37 +434,35 @@ window.BowlChallenge = function(sceneRef, physicsRef, playerGroup, cameraRef) {
 			throw new Error("Pin not found");
 		}
 
-		// 2. Inicializar la Pista y el Jugador (Lógica de initScene)
-		sceneRef.add(trackProtoMesh); // Añadir la pista a la escena VR
+		// 2.2 Inicializar la Pista y el Jugador
+		sceneRef.add(trackProtoMesh); 
 		
-		physicsRef.initTrack(trackProtoMesh); // Inicializar la pista en la física
+		physicsRef.initTrack(trackProtoMesh); 
 
 		// Añadir jugador local (slot 0)
 		addPlayer(0, true, 0, sceneRef, physicsRef); 
 		
-		// El resto de la inicialización de imitaciones (opcional)
-		// addImitation(-1);
-		// addImitation(1);
-
 	}, (xhr) => {
 		// Función de progreso (opcional)
 	}, (error) => {
 		console.error('Error loading GLTF model:', error);
-		alert("ERROR: No se pudo cargar el modelo 3D (scene.gltf). Revisa la ruta en bowlchallenge.js.");
+		alert("ERROR: No se pudo cargar el modelo 3D (res/scene.gltf). Revisa la ruta en bowlchallenge.js.");
 	});
 
 	// 3. RETORNO DE INTERFAZ
-	// Devolvemos las funciones que main.js necesita llamar en su bucle y en los eventos VR.
 	return {
 		// Llama a updateScene() que actualiza todos los jugadores
 		update: (dt) => updateScene(dt, sceneRef), 
-		onActionDown: onActionDown,
+		
+		// Las acciones ahora necesitan la cámara para el raycasting
+		onActionDown: (clientX, clientY, time) => onActionDown(clientX, clientY, time, cameraRef),
+		onActionMove: (clientX, clientY, time) => onActionMove(clientX, clientY, time, cameraRef),
 		onActionUp: onActionUp,
-		// Devuelve el objeto de puntuación para que main.js pueda leerlo en updateHUD()
+		
 		get scores() { 
 			return getLocalPlayer() ? getLocalPlayer().scores : null;
 		}
 	};
 }
 
-// ELIMINADA: La llamada automática a init() al final del archivo.
+// ELIMINADA la llamada automática a init() al final del archivo.
