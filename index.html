@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bolos VR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+
+    <script src="three.js"></script>
+    <script src="ammo.js"></script>
+    <script src="GLTFLoader.js"></script>
+    
+    </head>
+  <body>
+
+    <div id="hud">
+      <div class="badge">🎳 Puntuación: <span id="hudScore">0</span></div>
+      <div class="badge">🎯 Ronda: <span id="hudFrame">1 / 10</span></div>
+      <div class="badge">📌 Pines: <span id="hudPins">10</span></div>
+    </div>
+    
+    <canvas id="scene"></canvas>
+    
+    <script src="scores.js"></script>
+    <script src="bowlphysics.js"></script>
+    <script src="bowlchallenge.js"></script>
+
+    <script src="main.js"></script>
+  </body>
+</html>
