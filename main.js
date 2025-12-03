@@ -14,21 +14,23 @@ const WORLD_RADIUS = 20.0;       // Límite de movimiento
 // VARIABLES GLOBALES
 // ===================================================================
 
-// Nota: Se asume que THREE, VRButton, XRControllerModelFactory, Ammo y GLTFLoader
-// están disponibles globalmente gracias a las etiquetas <script> en index.html.
+// Nota: raycaster ha sido eliminado de esta declaración para evitar el conflicto
+// ya que es declarado en bowlchallenge.js (o será inicializado dentro de init).
 let camera, scene, renderer;
 let controls, player, floor;
 let controller1, controller2;
 let controllerGrip1, controllerGrip2;
 
 // Objetos de Juego
-let bowlGame;    // Almacena la interfaz de BowlChallenge (update, onActionDown/Up, scores)
-let bowlPhysics; // Almacena el objeto BowlPhysics
-
-const clock = new THREE.Clock();
+let bowlGame;    
+let bowlPhysics; 
 
 // Utilidades para Raycasting y VR
-let raycaster, tempVector, tempMatrix, tempQuaternion;
+let tempVector, tempMatrix, tempQuaternion; // <--- raycaster ELIMINADO de aquí
+
+const clock = new THREE.Clock();
+// NOTA: 'raycaster' será una variable global gracias al script bowlchallenge.js
+// o será inicializado dentro de init.
 
 
 // ===================================================================
@@ -98,8 +100,6 @@ function init() {
 
     // Controlador 1 (Mano izquierda - Movimiento)
     controller1 = renderer.xr.getController(0);
-    // Solo necesitamos selectend/start en el controlador 2 para el lanzamiento, 
-    // el controlador 1 se usa para el movimiento (joystick).
     player.add(controller1);
 
     controllerGrip1 = renderer.xr.getControllerGrip(0);
@@ -116,8 +116,10 @@ function init() {
     controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
     player.add(controllerGrip2);
 
-    // Utilidades
-    raycaster = new THREE.Raycaster();
+    // 6. Utilidades (Raycaster se inicializa aquí, usando la variable global)
+    // Se asume que bowlchallenge.js ya declaró raycaster globalmente usando 'var'
+    raycaster = new THREE.Raycaster(); 
+    
     tempVector = new THREE.Vector3();
     tempMatrix = new THREE.Matrix4();
     tempQuaternion = new THREE.Quaternion();
@@ -209,8 +211,7 @@ function updateHUD() {
     // Frame
     document.getElementById('hudFrame').textContent = `${scores.frameNumber + 1} / 10`;
 
-    // Pines restantes (Solo si la simulación no está activa, lo ideal es obtenerlo del motor de física)
-    const localPlayer = bowlGame.scores.players ? bowlGame.scores.players[0] : null; // Asumiendo que player[0] es local
+    // Pines restantes 
     const pinCount = bowlPhysics.pinBodies.filter(body => !!body).length;
     document.getElementById('hudPins').textContent = pinCount.toString();
 }
