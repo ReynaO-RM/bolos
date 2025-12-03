@@ -18,10 +18,10 @@ const IMITATION_THROW_TIME_MAX = 7.0;
 const IMITATION_THROW_POSITION_MAX = 0.3;
 const IMITATION_THROW_ANGLE_MAX = Math.PI / 18.0;
 
-var container, scene, camera, clock, renderer, ppi;
+// ELIMINADAS: var container, scene, camera, clock, renderer, ppi; <-- Evita conflictos
 var touchPoint, raycaster, pickPoint, dragPoint, releaseVector, pickSphere;
 var trackProtoMesh, ballProtoMesh, pinProtoMesh;
-var players, imitations, scoresDiv;
+var players, imitations, scoresDiv; 
 
 var imitationPlayerId = 0;
 var pickingBall = false;
@@ -31,6 +31,10 @@ var pickX = 0.0;
 var pickY = 0.0;
 var pickOffset = 0.0;
 var pickTime = 0;
+
+// ===================================================================
+// CLASES (Mantenidas)
+// ===================================================================
 
 class Player {
 	constructor(id, local, physics, scores, ballMesh, pinMeshes) {
@@ -51,81 +55,12 @@ class Imitation {
 	}
 }
 
-function init() {
-	scene = new THREE.Scene();
-	scene.background = new THREE.Color(0.7, 0.7, 0.7);
+// ===================================================================
+// FUNCIONES UTILITARIAS (Adaptadas)
+// ===================================================================
 
-	camera = new THREE.PerspectiveCamera(CAMERA_FOV, window.innerWidth / window.innerHeight,
-			CAMERA_NEAR, CAMERA_FAR);
-	camera.position.set(0.0, 1.7, 5.0);
-	camera.rotation.x = -25.0 / 180.0 * Math.PI;
-
-	var ambient = new THREE.AmbientLight(0xffffff, 0.4);
-	scene.add(ambient);
-
-	var light = new THREE.DirectionalLight(0xffffff, 0.6);
-	light.position.set(-0.4, 0.6, 1.0);
-	scene.add(light);
-
-	touchPoint = new THREE.Vector2();
-	pickPoint = new THREE.Vector3();
-	dragPoint = new THREE.Vector3();
-	releaseVector = new THREE.Vector3();
-	raycaster = new THREE.Raycaster();
-	pickSphere = new THREE.Sphere(new THREE.Vector3(), BALL_RADIUS);
-
-	clock = new THREE.Clock();
-
-	container = document.getElementById("container");
-
-	renderer = new THREE.WebGLRenderer({ antialias: false });
-	renderer.setPixelRatio(window.devicePixelRatio);
-	renderer.setSize(window.innerWidth, window.innerHeight);
-	renderer.gammaOutput = true;
-	container.appendChild(renderer.domElement);
-
-	scoresDiv = document.createElement("div");
-	scoresDiv.style = "position: fixed; left: 50%; top: 0; transform: translate(-50%, 0); margin-top: 5px; white-space: pre; font-family: monospace;";
-	container.appendChild(scoresDiv);
-
-	// XXX How to get pixel density?
-	ppi = 96 * window.devicePixelRatio;
-
-	window.addEventListener("resize", resizeViewport, false);
-
-	var loader = new THREE.GLTFLoader();
-	loader.load("assets/models/scene.gltf", (gltf) => {
-		trackProtoMesh = gltf.scene.children.find(child => child.name == "Track");
-		if (!trackProtoMesh) {
-			throw new Error("Track not found");
-		}
-		ballProtoMesh = gltf.scene.children.find(child => child.name == "Ball");
-		if (!ballProtoMesh) {
-			throw new Error("Ball not found");
-		}
-		pinProtoMesh = gltf.scene.children.find(child => child.name == "Pin");
-		if (!pinProtoMesh) {
-			throw new Error("Pin not found");
-		}
-
-		var maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
-		setAnisotropy(trackProtoMesh, maxAnisotropy);
-		setAnisotropy(ballProtoMesh, maxAnisotropy);
-		setAnisotropy(pinProtoMesh, maxAnisotropy);
-
-		Ammo().then((Ammo) => {
-			initScene();
-		});
-	});
-}
-
-function setAnisotropy(parent, anisotropy) {
-	parent.traverse((object) => {
-		if (object.isMesh && object.material && object.material.map) {
-			object.material.map.anisotropy = anisotropy;
-		}
-	});
-}
+// ELIMINADA: function init() { ... }
+// ELIMINADA: function setAnisotropy(parent, anisotropy) { ... } (Acceso a renderer es complicado aquí)
 
 function getLocalPlayer() {
 	if (!players) {
@@ -134,14 +69,14 @@ function getLocalPlayer() {
 	return players.find(p => p.local);
 }
 
-function addPlayer(id, local, slot) {
-	var physics = new BowlPhysics();
-
+// ADAPTADA: Ahora recibe la escena y la física ya creadas por main.js
+function addPlayer(id, local, slot, sceneRef, physicsRef) {
+	var physics = physicsRef; 
 	var scores = new Scores();
 
 	var group = new THREE.Group();
 	group.position.x = slot * TRACK_DISTANCE;
-	scene.add(group);
+	sceneRef.add(group); 
 
 	var trackMesh = trackProtoMesh.clone();
 	group.add(trackMesh);
@@ -149,7 +84,7 @@ function addPlayer(id, local, slot) {
 	var ballMesh = ballProtoMesh.clone();
 	group.add(ballMesh);
 
-	var pinMeshes = new Array(PIN_COUNT);
+	var pinMeshes = new Array(PIN_COUNT); 
 	for (var i = 0; i < pinMeshes.length; i++) {
 		var pinMesh = pinProtoMesh.clone();
 		group.add(pinMesh);
@@ -166,14 +101,14 @@ function addPlayer(id, local, slot) {
 	return player;
 }
 
-function removePlayer(id) {
+function removePlayer(id, sceneRef) {
 	if (!players) {
 		return;
 	}
 	for (var i = 0; i < players.length; i++) {
 		var player = players[i];
 		if (player.id === id) {
-			scene.remove(player.ballMesh.parent);
+			sceneRef.remove(player.ballMesh.parent); 
 			players.splice(i, 1);
 			return;
 		}
@@ -210,7 +145,7 @@ function restartImitation(imitation) {
 	imitations[imitationIndex] = createImitation(imitation.slot);
 }
 
-function updateImitation(imitation, dt) {
+function updateImitation(imitation, dt, sceneRef) {
 	imitation.waitingTime -= dt;
 	if (imitation.waitingTime > 0.0) {
 		return;
@@ -220,7 +155,8 @@ function updateImitation(imitation, dt) {
 			* (IMITATION_THROW_TIME_MAX - IMITATION_THROW_TIME_MIN);
 
 	if (!imitation.player) {
-		imitation.player = addPlayer(++imitationPlayerId, false, imitation.slot);
+		// Pasa las referencias a escena y física del jugador local
+		imitation.player = addPlayer(++imitationPlayerId, false, imitation.slot, sceneRef, players[0].physics);
 	}
 
 	if (imitation.player.scores.gameOver
@@ -231,27 +167,14 @@ function updateImitation(imitation, dt) {
 
 	var position = IMITATION_THROW_POSITION_MAX * 2.0 * (Math.random() - 0.5);
 	var angle = IMITATION_THROW_ANGLE_MAX * 2.0 * (Math.random() - 0.5);
-	var velocity = BALL_VELOCITY_MIN + Math.random() * (BALL_VELOCITY_MAX - BALL_VELOCITY_MIN);
+	var velocity = players[0].physics.BALL_VELOCITY_MIN + Math.random() * (players[0].physics.BALL_VELOCITY_MAX - players[0].physics.BALL_VELOCITY_MIN);
 	imitation.player.physics.positionBall(position, false);
 	imitation.player.physics.releaseBall(velocity, angle);
 }
 
-function initScene() {
-	addPlayer(0, true, 0);
+// ELIMINADA: function initScene() { ... } (su lógica se mueve a window.BowlChallenge)
 
-	//addImitation(-1);
-	//addImitation(1);
-
-	renderer.domElement.addEventListener("mousedown", onDocumentMouseDown, false);
-	renderer.domElement.addEventListener("mousemove", onDocumentMouseMove, false);
-	renderer.domElement.addEventListener("mouseup", onDocumentMouseUp, false);
-	renderer.domElement.addEventListener("touchstart", onDocumentTouchStart, false);
-	renderer.domElement.addEventListener("touchmove", onDocumentTouchMove, false);
-	renderer.domElement.addEventListener("touchend", onDocumentTouchEnd, false);
-
-	animate();
-}
-
+// MODIFICADA: Eliminamos la actualización directa al DOM (scoresDiv.innerHTML = ...)
 function updateGame(player, dt) {
 	player.physics.updatePhysics(dt);
 
@@ -262,10 +185,8 @@ function updateGame(player, dt) {
 
 		var prevFrameNumber = player.scores.frameNumber;
 		player.scores.addThrowResult(beatenPinCount);
-		if (player.local) {
-			scoresDiv.innerHTML = "  1  2  3  4  5  6  7  8  9  10<br/>| "
-					+ player.scores.getResultString() + " | " + player.scores.totalScore + " |";
-		}
+		
+		// ELIMINADA: La actualización directa del score aquí. Main.js lo maneja.
 
 		if (!player.scores.gameOver) {
 			var pinsMask;
@@ -285,10 +206,11 @@ function updateGame(player, dt) {
 	syncView(player);
 }
 
-function updateScene(dt) {
+// ADAPTADA: Recibe sceneRef para poder manejar las imitaciones
+function updateScene(dt, sceneRef) {
 	if (imitations) {
 		for (var i = 0; i < imitations.length; i++) {
-			updateImitation(imitations[i], dt);
+			updateImitation(imitations[i], dt, sceneRef);
 		}
 	}
 
@@ -299,11 +221,8 @@ function updateScene(dt) {
 	}
 }
 
-function resizeViewport() {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
-}
+// ELIMINADA: resizeViewport()
+// ELIMINADAS: render() y animate()
 
 function syncMeshToBody(mesh, body) {
 	var transform = body.getCenterOfMassTransform();
@@ -332,31 +251,30 @@ function syncView(player) {
 	}
 }
 
-function render() {
-	var dt = clock.getDelta();
+// ===================================================================
+// FUNCIONES DE ACCIÓN (Mantenidas)
+// ===================================================================
 
-	updateScene(dt);
-
-	renderer.render(scene, camera);
-}
-
-function animate() {
-	requestAnimationFrame(animate);
-
-	render();
-}
+// Estas funciones necesitan que raycaster y pickSphere estén inicializados
+// y necesitan el valor de ppi.
 
 function updateTouchRay(clientX, clientY) {
-	var rect = renderer.domElement.getBoundingClientRect();
-
+	// NOTA: Esta lógica asume un renderer.domElement y rect.
+	// En VR, main.js debe llamar a estas funciones, y el raycaster debe ser 
+	// el raycaster de VR. Mantendré la lógica original aquí, pero la dependencia
+	// de renderer.domElement y ppi puede causar inexactitud en el lanzamiento.
+	var rect = document.getElementById('scene').getBoundingClientRect();
+    
 	touchPoint.x = ((clientX - rect.left) / rect.width) * 2.0 - 1.0;
 	touchPoint.y = -((clientY - rect.top) / rect.height) * 2.0 + 1.0;
 
-	raycaster.setFromCamera(touchPoint, camera);
+    // Asumo que camera ya fue pasado y está disponible de forma global o local.
+	raycaster.setFromCamera(touchPoint, players[0].cameraRef || camera); 
 }
 
 function intersectTouchPlane(ray) {
-	if (Math.abs(ray.direction.y) > 1e-5) { // ray direction must not be parallel to base plane
+    // Asumo que BASE_HEIGHT es una constante global definida en otro script.
+	if (Math.abs(ray.direction.y) > 1e-5) { 
 		var t = (BASE_HEIGHT - ray.origin.y) / ray.direction.y;
 		if (t >= 0.0) {
 			dragPoint.copy(ray.direction).multiplyScalar(t).add(ray.origin);
@@ -376,6 +294,9 @@ function onActionDown(clientX, clientY, time) {
 		return;
 	}
 
+    // Usamos un valor fijo para ppi, ya que no podemos acceder a renderer aquí.
+    var ppi = 96 * window.devicePixelRatio; 
+
 	updateTouchRay(clientX, clientY);
 
 	pickingBall = false;
@@ -386,6 +307,7 @@ function onActionDown(clientX, clientY, time) {
 		return;
 	}
 
+    // Asumo que BALL_HEIGHT y BALL_LINE son constantes globales.
 	pickSphere.center.set(localPlayer.physics.releasePosition, BALL_HEIGHT, BALL_LINE);
 	if (raycaster.ray.intersectsSphere(pickSphere)) {
 		pickOffset = dragPoint.x - localPlayer.physics.releasePosition;
@@ -406,6 +328,9 @@ function onActionMove(clientX, clientY, time) {
 	if (localPlayer.physics.simulationActive) {
 		return;
 	}
+    
+    // Usamos un valor fijo para ppi, ya que no podemos acceder a renderer aquí.
+    var ppi = 96 * window.devicePixelRatio; 
 
 	updateTouchRay(clientX, clientY);
 
@@ -446,6 +371,7 @@ function onActionUp(clientX, clientY, time) {
 
 	if (rollingBall) {
 		releaseVector.copy(dragPoint).sub(pickPoint);
+        // Asumo que BALL_VELOCITY_MAX es una constante global.
 		var velocity = (time > pickTime)
 				? releaseVector.length() / (1e-3 * (time - pickTime))
 				: BALL_VELOCITY_MAX;
@@ -458,46 +384,76 @@ function onActionUp(clientX, clientY, time) {
 	rollingBall = false;
 }
 
-function onDocumentMouseDown(event) {
-	event.preventDefault();
+// ELIMINADAS: onDocumentMouseDown, onDocumentMouseMove, onDocumentMouseUp, 
+// onDocumentTouchStart, onDocumentTouchMove, onDocumentTouchEnd (¡CRÍTICO! Main.js usa onActionDown/Up)
 
-	onActionDown(event.clientX, event.clientY, event.timeStamp);
+// ===================================================================
+// INICIALIZACIÓN ADAPTADA PARA VR (REEMPLAZA function init())
+// ===================================================================
+
+// Exportamos la función para que main.js la llame después de Ammo()
+window.BowlChallenge = function(sceneRef, physicsRef, playerGroup, cameraRef) {
+    
+    // Inicialización de variables globales usadas por onActionDown/Up
+    touchPoint = new THREE.Vector2();
+    pickPoint = new THREE.Vector3();
+    dragPoint = new THREE.Vector3();
+    releaseVector = new THREE.Vector3();
+    raycaster = new THREE.Raycaster();
+    // Usamos BALL_RADIUS del objeto physics para inicializar pickSphere si está disponible
+    pickSphere = new THREE.Sphere(new THREE.Vector3(), physicsRef.BALL_RADIUS || 0.1); 
+    
+    // LÓGICA DE CARGA DE MODELOS
+	var loader = new THREE.GLTFLoader();
+	
+	// RUTA CRÍTICA: Asegúrate que esta ruta sea correcta
+	loader.load("assets/models/scene.gltf", (gltf) => {
+		
+		// 1. Extraer los prototipos del modelo GLTF
+		trackProtoMesh = gltf.scene.children.find(child => child.name == "Track");
+		if (!trackProtoMesh) {
+			throw new Error("Track not found");
+		}
+		ballProtoMesh = gltf.scene.children.find(child => child.name == "Ball");
+		if (!ballProtoMesh) {
+			throw new Error("Ball not found");
+		}
+		pinProtoMesh = gltf.scene.children.find(child => child.name == "Pin");
+		if (!pinProtoMesh) {
+			throw new Error("Pin not found");
+		}
+
+		// 2. Inicializar la Pista y el Jugador (Lógica de initScene)
+		sceneRef.add(trackProtoMesh); // Añadir la pista a la escena VR
+		
+		physicsRef.initTrack(trackProtoMesh); // Inicializar la pista en la física
+
+		// Añadir jugador local (slot 0)
+		addPlayer(0, true, 0, sceneRef, physicsRef); 
+		
+		// El resto de la inicialización de imitaciones (opcional)
+		// addImitation(-1);
+		// addImitation(1);
+
+	}, (xhr) => {
+		// Función de progreso (opcional)
+	}, (error) => {
+		console.error('Error loading GLTF model:', error);
+		alert("ERROR: No se pudo cargar el modelo 3D (scene.gltf). Revisa la ruta en bowlchallenge.js.");
+	});
+
+	// 3. RETORNO DE INTERFAZ
+	// Devolvemos las funciones que main.js necesita llamar en su bucle y en los eventos VR.
+	return {
+		// Llama a updateScene() que actualiza todos los jugadores
+		update: (dt) => updateScene(dt, sceneRef), 
+		onActionDown: onActionDown,
+		onActionUp: onActionUp,
+		// Devuelve el objeto de puntuación para que main.js pueda leerlo en updateHUD()
+		get scores() { 
+			return getLocalPlayer() ? getLocalPlayer().scores : null;
+		}
+	};
 }
 
-function onDocumentMouseMove(event) {
-	event.preventDefault();
-
-	onActionMove(event.clientX, event.clientY, event.timeStamp);
-}
-
-function onDocumentMouseUp(event) {
-	event.preventDefault();
-
-	onActionUp(event.clientX, event.clientY, event.timeStamp);
-}
-
-function onDocumentTouchStart(event) {
-	var timeStamp = event.timeStamp;
-	event.preventDefault();
-	event = event.changedTouches[0];
-
-	onActionDown(event.clientX, event.clientY, timeStamp);
-}
-
-function onDocumentTouchMove(event) {
-	var timeStamp = event.timeStamp;
-	event.preventDefault();
-	event = event.changedTouches[0];
-
-	onActionMove(event.clientX, event.clientY, timeStamp);
-}
-
-function onDocumentTouchEnd(event) {
-	var timeStamp = event.timeStamp;
-	event.preventDefault();
-	event = event.changedTouches[0];
-
-	onActionUp(event.clientX, event.clientY, timeStamp);
-}
-
-init();
+// ELIMINADA: La llamada automática a init() al final del archivo.
